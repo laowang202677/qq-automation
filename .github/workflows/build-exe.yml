@@ -12,22 +12,23 @@ jobs:
         with:
           node-version: '20'
       - run: npm install
-      - run: npm install nexe
+      - run: npm install -g esbuild nexe
       - name: Transpile ESM to CJS
         shell: powershell
         run: |
           mkdir dist -Force
-          npx esbuild server.js --platform=node --format=cjs --target=node14 --outfile=dist/server.js
-          npx esbuild config.js --platform=node --format=cjs --target=node14 --outfile=dist/config.js
-          npx esbuild db.js --platform=node --format=cjs --target=node14 --outfile=dist/db.js
-          Get-ChildItem modules/*.js | ForEach-Object { $name = $_.Name; npx esbuild $_.FullName --platform=node --format=cjs --target=node14 --outfile="dist/$name" }
+          esbuild server.js --platform=node --format=cjs --target=node14 --outfile=dist/server.js
+          esbuild config.js --platform=node --format=cjs --target=node14 --outfile=dist/config.js
+          esbuild db.js --platform=node --format=cjs --target=node14 --outfile=dist/db.js
+          Get-ChildItem modules/*.js | ForEach-Object { $name = $_.Name; esbuild $_.FullName --platform=node --format=cjs --target=node14 --outfile="dist/$name" }
+          if (!(Test-Path dist/server.js)) { throw "dist/server.js not created!" }
           Copy-Item public dist/ -Recurse -Force
           Copy-Item package.json dist/
       - name: Build EXE
         run: |
+          dir dist\*.js
           npx nexe dist/server.js --target windows-x64-14.15.3 --resource "./dist/**/*.js" --resource "./dist/public/**/*" --resource "./dist/package.json" --resource "./node_modules/**/*" --output QQ_Automation.exe
-      - name: Check EXE size
-        run: ls -la QQ_Automation.exe
+          dir QQ_Automation.exe
       - uses: actions/upload-artifact@v4
         with:
           name: QQ_Automation
