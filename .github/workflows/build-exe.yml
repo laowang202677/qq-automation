@@ -14,18 +14,16 @@ jobs:
       - run: npm install
       - run: npm install nexe
       - name: Transpile ESM to CJS
+        shell: powershell
         run: |
-          mkdir -p dist
+          mkdir dist -Force
           npx esbuild server.js --platform=node --format=cjs --outfile=dist/server.js
           npx esbuild config.js --platform=node --format=cjs --outfile=dist/config.js
           npx esbuild db.js --platform=node --format=cjs --outfile=dist/db.js
-          for f in modules/*.js; do
-            name=$(basename $f)
-            npx esbuild "$f" --platform=node --format=cjs --outfile="dist/$name"
-          done
-          copy public dist/public /E
-          copy package.json dist\
-      - name: Build EXE with Node.js 14
+          Get-ChildItem modules/*.js | ForEach-Object { $name = $_.Name; npx esbuild $_.FullName --platform=node --format=cjs --outfile="dist/$name" }
+          Copy-Item public dist/ -Recurse -Force
+          Copy-Item package.json dist/
+      - name: Build EXE
         run: |
           npx nexe dist/server.js --target windows-x64-14.15.3 --resource "./dist/**/*.js" --resource "./dist/public/**/*" --resource "./dist/package.json" --resource "./node_modules/**/*" --output QQ_Automation.exe
       - uses: actions/upload-artifact@v4
