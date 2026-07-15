@@ -1,0 +1,1079 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QQ自动化系统 - 管理平台</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,'PingFang SC','Noto Sans SC',sans-serif;background:#0a0a0f;color:#e4e4e7;display:flex;height:100vh}
+.sidebar{width:200px;background:#111118;border-right:1px solid #1a1a23;padding:16px 0;flex-shrink:0}
+.sidebar h2{font-size:14px;padding:0 16px 12px;color:#6366f1;border-bottom:1px solid #1a1a23;margin-bottom:8px}
+.sidebar .nav-item{padding:10px 16px;cursor:pointer;font-size:13px;color:#888;display:flex;align-items:center;gap:8px}
+.sidebar .nav-item:hover{background:#1a1a23;color:#e4e4e7}
+.sidebar .nav-item.active{background:#1a1a2e;color:#818cf8;border-right:2px solid #6366f1}
+.main{flex:1;overflow-y:auto;padding:24px}
+.tab-content{display:none}
+.tab-content.active{display:block}
+.card{background:#1a1a23;border-radius:12px;padding:20px;margin-bottom:16px}
+.card h3{font-size:14px;color:#a1a1aa;margin-bottom:12px}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:end}
+.row>*{flex:1;min-width:140px}
+input,select,textarea{width:100%;padding:8px 12px;border-radius:8px;border:1px solid #2a2a35;background:#13131c;color:#e4e4e7;font-size:13px;outline:none}
+input:focus,select:focus{border-color:#6366f1}
+textarea{resize:vertical;min-height:50px}
+label{display:block;font-size:11px;color:#71717a;margin-bottom:3px;margin-top:8px}
+.btn{padding:8px 16px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:600}
+.btn-primary{background:#6366f1;color:#fff}
+.btn-danger{background:#ef4444;color:#fff}
+.btn-success{background:#22c55e;color:#fff}
+.btn-outline{background:transparent;border:1px solid #2a2a35;color:#a1a1aa}
+.btn-sm{padding:4px 10px;font-size:11px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th,td{padding:8px 10px;text-align:left;border-bottom:1px solid #1a1a23}
+th{color:#71717a;font-weight:600;font-size:11px}
+td{color:#d4d4d8}
+.badge{padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;white-space:nowrap}
+.badge-green{background:rgba(34,197,94,.15);color:#22c55e}
+.badge-yellow{background:rgba(234,179,8,.15);color:#eab308}
+.badge-red{background:rgba(239,68,68,.15);color:#ef4444}
+.badge-blue{background:rgba(99,102,241,.15);color:#818cf8}
+.badge-gray{background:rgba(113,113,122,.15);color:#71717a}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}
+.stat-box{background:#13131c;border-radius:10px;padding:14px;text-align:center}
+.stat-box .num{font-size:24px;font-weight:700;color:#818cf8}
+.stat-box .lbl{font-size:11px;color:#71717a;margin-top:2px}
+.progress-bar{height:4px;background:#1a1a23;border-radius:2px;margin-top:4px;overflow:hidden}
+.progress-bar .fill{height:100%;border-radius:2px;transition:width .3s}
+.progress-bar .fill.green{background:#22c55e}
+.progress-bar .fill.yellow{background:#eab308}
+.hidden{display:none!important}
+.status-tag{display:inline-flex;align-items:center;gap:4px}
+.status-dot{width:6px;height:6px;border-radius:50%;display:inline-block}
+@media(max-width:768px){.sidebar{width:160px}.main{padding:16px}}
+</style>
+<script>
+window.createRegTask = function() {
+  var el=document.getElementById('registrarResult');
+  if(!el) return;
+  el.innerHTML='<span style="color:#eab308">⏳ 请求中...</span>';
+  fetch('/api/registrar/create',{method:'POST'}).then(function(r){return r.json()}).then(function(d){
+    el.innerHTML='<span style="color:#22c55e">✅ 任务#'+d.id+' 已创建</span>';
+    if(typeof loadRegTasks==='function') loadRegTasks();
+    if(typeof loadRegStats==='function') loadRegStats();
+  }).catch(function(e){
+    el.innerHTML='<span style="color:#ef4444">❌ '+e.message+'</span>';
+  });
+};
+window.onerror = function(msg, url, line, col, err) {
+  var el = document.getElementById('registrarResult');
+  if (el) el.innerHTML = '<span style="color:#ef4444">JS错误: ' + msg + ' (行' + line + ')</span>';
+};
+</script>
+</head>
+<body>
+
+<div class="sidebar">
+  <h2>📡 QQ自动化</h2>
+  <div class="nav-item active" onclick="switchTab('dashboard')">📊 总控台</div>
+  <div class="nav-item" onclick="switchTab('accounts')">👤 账号池</div>
+  <div class="nav-item" onclick="switchTab('registrar')">📱 注册</div>
+  <div class="nav-item" onclick="switchTab('collector')">🎯 群采集</div>
+  <div class="nav-item" onclick="switchTab('contacts')">👥 联系人</div>
+  <div class="nav-item" onclick="switchTab('tasks')">📋 任务队列</div>
+  <div class="nav-item" onclick="switchTab('messages')">💬 话术库</div>
+  <div class="nav-item" onclick="switchTab('risk')">⚠️ 风控</div>
+  <div class="nav-item" onclick="switchTab('settings')">⚙️ 设置</div>
+  <div style="flex:1"></div>
+  <div class="nav-item" onclick="location.reload()" style="font-size:11px;color:#52525b">🔄 刷新</div>
+</div>
+
+<div class="main">
+  <!-- ========== 总控台 ========== -->
+  <div id="tab-dashboard" class="tab-content active">
+    <div class="card">
+      <h3>系统概览</h3>
+      <div class="stat-grid" id="dashboardStats">
+        <div class="stat-box"><div class="num" id="dTotal">0</div><div class="lbl">总账号</div></div>
+        <div class="stat-box"><div class="num" id="dReady">0</div><div class="lbl">可用号</div></div>
+        <div class="stat-box"><div class="num" id="dBreeding">0</div><div class="lbl">养号中</div></div>
+        <div class="stat-box"><div class="num" id="dBanned">0</div><div class="lbl">已封号</div></div>
+        <div class="stat-box"><div class="num" id="dGroups">0</div><div class="lbl">目标群</div></div>
+        <div class="stat-box"><div class="num" id="dTasks">0</div><div class="lbl">待执行任务</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>执行器状态</h3>
+      <div class="stat-grid" style="margin-bottom:12px">
+        <div class="stat-box"><div class="num" id="execStatus">⚪</div><div class="lbl">引擎状态</div></div>
+        <div class="stat-box"><div class="num" id="execDone">0</div><div class="lbl">已执行</div></div>
+        <div class="stat-box"><div class="num" id="execSuccess">0</div><div class="lbl">成功</div></div>
+        <div class="stat-box"><div class="num" id="execFailed">0</div><div class="lbl">失败</div></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <button class="btn btn-success btn-sm" onclick="startExecutor()">▶ 启动引擎</button>
+        <button class="btn btn-danger btn-sm" onclick="stopExecutor()">⏹ 停止引擎</button>
+      </div>
+
+      <h3>每日操作量</h3>
+      <div class="row" id="dailyOps">
+        <div class="stat-box"><div class="num" id="dTodaySends">0</div><div class="lbl">今日私信 / 上限</div></div>
+        <div class="stat-box"><div class="num" id="dTodayGroups">0</div><div class="lbl">今日加群</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>快速操作</h3>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="switchTab('accounts')">👤 管理账号</button>
+        <button class="btn btn-primary" onclick="switchTab('groups')">🎯 管理目标群</button>
+        <button class="btn btn-primary" onclick="switchTab('tasks')">📋 查看任务</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 账号池 ========== -->
+  <div id="tab-accounts" class="tab-content">
+    <div class="card">
+      <h3>批量导入QQ号</h3>
+      <p style="font-size:12px;color:#52525b;margin-bottom:8px">每行一个：QQ号,密码,备注(可选)</p>
+      <textarea id="importText" rows="6" placeholder="123456,pass123,小号1&#10;789012,pass456,小号2"></textarea>
+      <button class="btn btn-primary" onclick="importAccounts()">📥 导入</button>
+      <span id="importResult" style="font-size:12px;color:#22c55e;margin-left:8px"></span>
+    </div>
+
+    <div class="card">
+      <h3>账号列表 <span id="acctCount" style="font-size:12px;color:#52525b">(0)</span></h3>
+      <div style="margin-bottom:8px;display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-outline btn-sm" onclick="loadAccounts()">全部</button>
+        <button class="btn btn-outline btn-sm" onclick="loadAccounts('pending')">待养号</button>
+        <button class="btn btn-outline btn-sm" onclick="loadAccounts('breeding')">养号中</button>
+        <button class="btn btn-outline btn-sm" onclick="loadAccounts('ready')">可用号</button>
+        <button class="btn btn-outline btn-sm" onclick="loadAccounts('banned')">已封号</button>
+      </div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr><th>ID</th><th>QQ号</th><th>备注</th><th>状态</th><th>已养天数</th><th>今日私信</th><th>操作</th></tr></thead>
+          <tbody id="acctTable"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 目标群 ========== -->
+  <div id="tab-registrar" class="tab-content">
+  <div class="card">
+    <h3>📱 QQ号注册</h3>
+    <p style="font-size:11px;color:#52525b;margin-bottom:8px">流程：创建任务 → 获取手机号 → QQ里注册 → 收验证码 → 自动入库</p>
+    <div class="stat-grid" style="margin-bottom:12px">
+      <div class="stat-box"><div class="num" id="regTotal">0</div><div class="lbl">总计</div></div>
+      <div class="stat-box"><div class="num" id="regDone">0</div><div class="lbl">成功</div></div>
+      <div class="stat-box"><div class="num" id="regFailed">0</div><div class="lbl">失败</div></div>
+      <div class="stat-box"><div class="num" id="regPending">0</div><div class="lbl">进行中</div></div>
+    </div>
+    <button class="btn btn-primary" onclick="window.createRegTask()">🆕 创建注册任务</button>
+    <button class="btn btn-outline btn-sm" onclick="document.getElementById('registrarResult').textContent='✅ JS运行正常，点击了注册按钮'">🔍 测试JS</button>
+    <span id="registrarResult" style="font-size:12px;color:#818cf8;margin-left:8px"></span>
+  </div>
+  <div class="card">
+    <h3>注册记录</h3>
+    <table><thead><tr><th>ID</th><th>手机号</th><th>注册QQ</th><th>状态</th></tr></thead><tbody id="regTaskTable"></tbody></table>
+  </div>
+</div>
+
+<div id="tab-collector" class="tab-content">
+<!-- ========== QQ注册 ========== -->
+    <div class="card">
+      <h3>添加目标群</h3>
+      <div class="row">
+        <div><label>群号</label><input type="text" id="groupNum" placeholder="群号"></div>
+        <div><label>群名/关键词</label><input type="text" id="groupKeyword" placeholder="关键词"></div>
+        <div><label>优先级</label>
+          <select id="groupPriority"><option value="high">高</option><option value="medium" selected>中</option><option value="low">低</option></select>
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="addGroup()">➕ 添加</button>
+    </div>
+
+    <div class="card">
+      <h3>推荐搜群关键词 <span style="font-size:11px;color:#52525b">(42个)</span></h3>
+      <div id="keywordTags" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+      <button id="kwToggleBtn" class="btn btn-outline btn-sm" style="margin-top:8px" onclick="toggleKeywords()">显示全部</button>
+    </div>
+
+    <div class="card">
+      <h3>目标群列表</h3>
+      <table><thead><tr><th>群号</th><th>关键词</th><th>状态</th><th>操作</th></tr></thead><tbody id="groupTable"></tbody></table>
+    </div>
+  </div>
+
+  <!-- ========== 任务队列 ========== -->
+  <div id="tab-tasks" class="tab-content">
+    <div class="card">
+      <h3>任务队列</h3>
+      <div style="display:flex;gap:6px;margin-bottom:8px">
+        <button class="btn btn-outline btn-sm" onclick="loadTasks()">全部</button>
+        <button class="btn btn-outline btn-sm" onclick="loadTasks('pending')">待执行</button>
+        <button class="btn btn-outline btn-sm" onclick="loadTasks('done')">已完成</button>
+      </div>
+      <table><thead><tr><th>ID</th><th>类型</th><th>内容</th><th>排期</th><th>状态</th></tr></thead><tbody id="taskTable"></tbody></table>
+    </div>
+  </div>
+
+  <!-- ========== 联系人（含漏斗追踪） ========== -->
+<div id="tab-contacts" class="tab-content">
+  <div class="card">
+    <h3>➕ 记录联系人</h3>
+    <div class="row">
+      <div><label>对方QQ</label><input type="text" id="contactQQ" placeholder="QQ号"></div>
+      <div><label>来源群</label><input type="text" id="contactSource" placeholder="哪个群加的"></div>
+      <div><label>使用账号</label><input type="text" id="contactAccount" placeholder="用哪个号加的"></div>
+      <div><label>阶段</label>
+        <select id="contactStage">
+          <option value="new">刚加好友</option>
+          <option value="chatting">已聊过</option>
+          <option value="interested">感兴趣</option>
+          <option value="sent_link">已发链接</option>
+          <option value="registered">已注册</option>
+          <option value="trading">开始交易</option>
+          <option value="lost">丢了</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="addContact()">➕ 记录</button>
+    <span id="contactAddResult" style="font-size:12px;color:#22c55e;margin-left:8px"></span>
+  </div>
+
+  <div class="card">
+    <h3>联系人漏斗</h3>
+    <div class="stat-grid" id="contactFunnel" style="margin-bottom:12px"></div>
+  </div>
+
+  <div class="card">
+    <h3>联系人列表 <span id="contactCount" style="font-size:12px;color:#52525b">(0)</span></h3>
+    <div style="display:flex;gap:6px;margin-bottom:8px">
+      <button class="btn btn-outline btn-sm" onclick="loadContacts()">全部</button>
+      <button class="btn btn-outline btn-sm" onclick="loadContacts('chatting')">跟进中</button>
+      <button class="btn btn-outline btn-sm" onclick="loadContacts('trading')">已转化</button>
+      <button class="btn btn-outline btn-sm" onclick="loadContacts('lost')">已丢</button>
+    </div>
+    <table><thead><tr><th>QQ</th><th>来源</th><th>账号</th><th>阶段</th><th>操作</th></tr></thead><tbody id="contactTable"></tbody></table>
+  </div>
+</div>
+<!-- ========== 风控面板 ========== -->
+<div id="tab-risk" class="tab-content">
+  <div class="card">
+    <h3>📊 风控概览</h3>
+    <div class="stat-grid">
+      <div class="stat-box"><div class="num" id="riskHealthy">0</div><div class="lbl">健康账号</div></div>
+      <div class="stat-box"><div class="num" id="riskLimited">0</div><div class="lbl">被限制</div></div>
+      <div class="stat-box"><div class="num" id="riskBanned">0</div><div class="lbl">已封号</div></div>
+      <div class="stat-box"><div class="num" id="riskTodaySend">0</div><div class="lbl">今日私信</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>🛡️ 风控规则一览</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;color:#a1a1aa">
+      <div>养号最低天数: <strong id="rMinAge">7</strong>天</div>
+      <div>安全天数: <strong id="rSafeAge">15</strong>天</div>
+      <div>每日私信上限: <strong id="rSendLimit">15</strong>条</div>
+      <div>每日加群上限: <strong id="rGroupLimit">3</strong>个</div>
+      <div>私信间隔: <strong id="rSendIntv">5</strong>分钟</div>
+      <div>加群间隔: <strong id="rGroupIntv">120</strong>分钟</div>
+      <div>操作时段: <strong id="rHours">全天</strong></div>
+      <div>温启动: <strong id="rWarmup">3+4+7天</strong></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>📋 操作日志</h3>
+    <div id="logList" style="font-size:12px;color:#71717a;max-height:300px;overflow-y:auto"></div>
+  </div>
+</div>
+<!-- ========== 话术库 ========== -->
+  <div id="tab-messages" class="tab-content">
+    <div class="card">
+      <h3>添加话术</h3>
+      <label>场景</label>
+      <select id="msgScene">
+        <option value="first">首次私信</option>
+        <option value="follow">跟进</option>
+        <option value="convert">转化</option>
+      </select>
+      <label>话术内容</label>
+      <textarea id="msgContent" rows="3" placeholder="话术内容..."></textarea>
+      <label>图片（选填，多个用逗号分隔路径）</label>
+      <input type="text" id="msgImages" placeholder="图片路径，如: /images/1.jpg,/images/2.jpg">
+      <button class="btn btn-primary" onclick="addMessage()">➕ 添加</button>
+    <button class="btn btn-outline" onclick="aiRewrite()" style="margin-left:6px">🤖 AI改写</button>
+    <span id="aiRewriteResult" style="font-size:12px;color:#818cf8;margin-left:8px"></span>
+    </div>
+
+    <div class="card">
+      <h3>话术列表 <span id="msgCount" style="font-size:12px;color:#52525b">(0)</span></h3>
+      <table><thead><tr><th>场景</th><th>内容</th><th>操作</th></tr></thead><tbody id="msgTable"></tbody></table>
+    </div>
+  </div>
+
+  <!-- ========== 设置 ========== -->
+  <div id="tab-settings" class="tab-content">
+    <div class="card">
+      <h3>风控规则</h3>
+      <div class="row">
+        <div><label>最低养号天数</label><input type="number" id="cfgMinAge" value="7"></div>
+        <div><label>安全养号天数</label><input type="number" id="cfgSafeAge" value="15"></div>
+        <div><label>每日私信上限</label><input type="number" id="cfgSendLimit" value="15"></div>
+      </div>
+      <div class="row">
+        <div><label>每日加群上限</label><input type="number" id="cfgGroupLimit" value="3"></div>
+        <div><label>私信间隔(分钟)</label><input type="number" id="cfgSendInterval" value="5"></div>
+      </div>
+      <button class="btn btn-primary" onclick="saveConfig()">💾 保存规则</button>
+    </div>
+
+    <div class="card">
+      <h3>📱 短信平台配置</h3>
+      <div class="row">
+        <div><label>服务商</label><select id="smsProvider" onchange="smsToggle()"><option value="manual">手动输入</option><option value="5sim">5sim</option></select></div>
+        <div style="flex:2"><label>API Key</label><input type="password" id="smsApiKey" placeholder="5sim API Key"></div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="saveSms()">💾 保存</button>
+      <span id="smsResult" style="font-size:12px;color:#22c55e;margin-left:8px"></span>
+    </div>
+
+    <div class="card">
+      <h3>🦞 NapCat 执行引擎配置</h3>
+      <p style="font-size:11px;color:#52525b;margin-bottom:8px">
+        NapCat启动后填入连接信息，执行引擎即可自动控制QQ发消息/加群
+      </p>
+      <div class="row">
+        <div style="flex:2"><label>NapCat地址</label><input type="text" id="napcatUrl" value="http://127.0.0.1:3000" placeholder="http://127.0.0.1:3000"></div>
+        <div><label>Token（可选）</label><input type="password" id="napcatToken" placeholder="NapCat Token"></div>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="testNapcat()">🔌 测试连接</button>
+      <button class="btn btn-primary btn-sm" onclick="saveNapcat()" style="margin-left:6px">💾 保存</button>
+      <span id="napcatTestResult" style="font-size:12px;color:#22c55e;margin-left:8px"></span>
+    </div>
+
+    <div class="card">
+      <h3>AI配置（可选）</h3>
+      <div class="row">
+        <div><label>AI服务商</label>
+          <select id="aiProvider"><option value="">不使用</option><option value="deepseek">DeepSeek</option><option value="qwen">通义千问</option><option value="glm">GLM-4</option></select>
+        </div>
+        <div style="flex:2"><label>API Key</label><input type="password" id="aiKey" placeholder="填写后启用AI"></div>
+      </div>
+      <button class="btn btn-primary" onclick="saveAIConfig()">💾 保存AI配置</button>
+    </div>
+
+    <div class="card">
+    <div class="card">
+      <h3>🧠 自适应规则引擎</h3>
+      <p style="font-size:11px;color:#52525b;margin-bottom:8px">
+        根据实际运行数据自动调整风控参数。封号率过高时自动收紧，稳定时逐步放开。
+      </p>
+      <div class="stat-grid" style="margin-bottom:8px">
+        <div class="stat-box"><div class="num" id="adpMode">normal</div><div class="lbl">当前模式</div></div>
+        <div class="stat-box"><div class="num" id="adpSend">15</div><div class="lbl">当前私信上限</div></div>
+        <div class="stat-box"><div class="num" id="adpGroup">3</div><div class="lbl">当前加群上限</div></div>
+        <div class="stat-box"><div class="num" id="adpInterval">5</div><div class="lbl">当前间隔(分)</div></div>
+        <div class="stat-box"><div class="num" id="adpAdjusts">0</div><div class="lbl">调整次数</div></div>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-primary btn-sm" onclick="runAdaptive()">🔄 执行评估</button>
+        <button class="btn btn-outline btn-sm" onclick="aiAdaptive()" style="margin-left:6px">🤖 AI分析建议</button>
+        <span id="adpResult" style="font-size:12px;margin-left:8px"></span>
+      </div>
+      <div id="adpHistory" style="margin-top:8px;font-size:12px;color:#71717a"></div>
+    </div>
+      <h3>数据管理</h3>
+      <button class="btn btn-outline" onclick="loadOperationLogs()">📋 查看操作日志</button>
+  <button class="btn btn-outline" onclick="exportData()">📥 导出数据</button>
+      <button class="btn btn-outline" onclick="document.getElementById('importFile').click()" style="margin-left:8px">📤 导入数据</button>
+      <input type="file" id="importFile" accept=".json" class="hidden" onchange="importData(event)">
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '/api';
+
+// ===== 标签切换 =====
+function switchTab(name) {
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  event?.target?.classList?.add('active');
+  document.getElementById('tab-'+name)?.classList.add('active');
+  // 切换到账号页自动加载
+  if (name === 'registrar') { loadRegTasks(); loadRegStats(); }
+                if (name === 'accounts') loadAccounts();
+  if (name === 'groups') { loadGroups(); loadKeywords(); }
+  if (name === 'tasks') loadTasks();
+  if (name === 'messages') loadMessages();
+  if (name === 'settings') loadConfig();
+  if (name === 'dashboard') // 关键词折叠控制
+var kwShowAll = false;
+function toggleKeywords() {
+  kwShowAll = !kwShowAll;
+  document.getElementById('kwToggleBtn').textContent = kwShowAll ? '收起' : '显示全部';
+  renderKeywords();
+}
+
+function renderKeywords() {
+  var div = document.getElementById('keywordTags');
+  var display = kwShowAll ? keywords : keywords.slice(0, 18);
+  div.innerHTML = display.map(function(k) {
+    return '<span class="badge badge-blue" style="cursor:pointer;padding:4px 10px" onclick="setTargetKW(\''+k+'\')">'+k+'</span>';
+  }).join('');
+  if (!kwShowAll && keywords.length > 18) {
+    div.innerHTML += '<span style="color:#52525b;font-size:11px;line-height:28px">+ ' + (keywords.length - 18) + ' 个...</span>';
+  }
+}
+
+// 重写loadKeywords
+async function loadKeywords() {
+  var res = await fetch('/api/config');
+  var cfg = await res.json();
+  keywords = cfg.searchKeywords || [];
+  renderKeywords();
+}
+
+// ===== 群采集功能 =====
+async function loadCollectorStats() {
+  const s = await api('GET', '/collector/stats');
+  document.getElementById('cTotal').textContent = s.total || 0;
+  document.getElementById('cQualified').textContent = s.qualified || 0;
+  document.getElementById('cJoined').textContent = s.joined || 0;
+  document.getElementById('cMuted').textContent = s.muted || 0;
+  document.getElementById('cFailed').textContent = s.failed || 0;
+  loadPendingGroups();
+}
+
+async function loadPendingGroups() {
+  const list = await api('GET', '/collector/pending?limit=20');
+  document.getElementById('pendingCount').textContent = '(' + list.length + ')';
+  const tbody = document.getElementById('pendingTable');
+  tbody.innerHTML = list.map(g => '<tr><td>' + g.groupNum + '</td><td>' + (g.groupName || '-') + '</td><td>' + g.memberCount + '</td><td>' + g.keyword + '</td><td><button class="btn btn-outline btn-sm" onclick="markGroupJoined(' + g.id + ')">✅ 已加</button></td></tr>').join('') ||
+    '<tr><td colspan="5" style="text-align:center;color:#52525b">暂无合格群，去采集吧</td></tr>';
+}
+
+async function markGroupJoined(id) {
+  await api('PUT', '/groups/' + id, { status: 'joined' });
+  loadPendingGroups();
+  loadCollectorStats();
+}
+
+async function importGroups() {
+  const keyword = document.getElementById('importKeyword').value.trim();
+  const text = document.getElementById('importResults').value.trim();
+  if (!keyword || !text) { alert('请填写关键词和群数据'); return; }
+  const lines = text.split('\n').filter(l => l.trim());
+  const groups = lines.map(l => {
+    var p = l.split(',').map(s => s.trim());
+    return { groupNum: p[0], groupName: p[1] || '', memberCount: parseInt(p[2]) || 0, isMuted: (p[3] === '1' || p[3] === 'true') };
+  });
+  const r = await api('POST', '/collector/import', { keyword, groups });
+  document.getElementById('importGroupResult').textContent = '导入' + r.imported + '个，过滤' + r.filtered + '个，合格' + r.qualified + '个';
+  loadCollectorStats();
+}
+
+async function suggestKeyword() {
+  const r = await api('GET', '/collector/next-keyword');
+  document.getElementById('kwSuggestion').textContent = '💡 建议搜索: ' + (r.keyword || '所有关键词已搜过');
+}
+
+async function manualAddGroup() {
+  const body = {
+    groupNum: document.getElementById('manualGroupNum').value.trim(),
+    groupName: document.getElementById('manualGroupName').value.trim(),
+    memberCount: parseInt(document.getElementById('manualMemberCount').value) || 0,
+    isMuted: document.getElementById('manualIsMuted').value === 'true'
+  };
+  if (!body.groupNum) { alert('请输入群号'); return; }
+  const r = await api('POST', '/collector/manual-add', body);
+  if (r.error) { alert(r.error); return; }
+  document.getElementById('manualAddResult').textContent = '✅ 已添加 ' + (r.group.isMuted ? '(禁言群已过滤)' : '(合格)');
+  loadCollectorStats();
+}
+
+// ===== 联系人管理 =====
+function getStageLabel(s) {
+  var m = { new:'刚加好友', chatting:'已聊过', interested:'感兴趣', sent_link:'已发链接', registered:'已注册', trading:'开始交易', lost:'丢了' };
+  return m[s] || s;
+}
+function getStageColor(s) {
+  var m = { new:'badge-yellow', chatting:'badge-blue', interested:'badge-blue', sent_link:'badge-green', registered:'badge-green', trading:'badge-green', lost:'badge-red' };
+  return m[s] || 'badge-gray';
+}
+
+async function addContact() {
+  var qq = document.getElementById('contactQQ').value.trim();
+  if (!qq) { alert('请输入对方QQ号'); return; }
+  var body = {
+    qq: qq,
+    source: document.getElementById('contactSource').value.trim() || '未标注',
+    accountId: document.getElementById('contactAccount').value.trim() || '',
+    status: document.getElementById('contactStage').value,
+    createdAt: new Date().toISOString()
+  };
+  var r = await api('POST', '/contacts', body);
+  document.getElementById('contactAddResult').textContent = '✅ 已记录';
+  loadContacts();
+}
+
+async function loadContacts(filter) {
+  var list = await api('GET', '/contacts');
+  if (filter) list = list.filter(c => c.status === filter);
+  document.getElementById('contactCount').textContent = '(' + list.length + ')';
+  var tbody = document.getElementById('contactTable');
+  tbody.innerHTML = list.map(c => '<tr><td>' + c.qq + '</td><td>' + (c.source || '-') + '</td><td>' + (c.accountId || '-') + '</td><td><span class="badge ' + getStageColor(c.status) + '">' + getStageLabel(c.status) + '</span></td><td><select onchange="updateContact(' + c.id + ',this.value)" style="font-size:11px;padding:2px 4px">'
+    + ['new','chatting','interested','sent_link','registered','trading','lost'].map(s => '<option value="' + s + '"' + (c.status === s ? ' selected' : '') + '>' + getStageLabel(s) + '</option>').join('')
+    + '</select></td></tr>').join('') || '<tr><td colspan="5" style="text-align:center;color:#52525b">暂无联系人</td></tr>';
+  updateContactFunnel(list);
+}
+
+function updateContactFunnel(list) {
+  var stages = ['new','chatting','interested','sent_link','registered','trading','lost'];
+  var labels = ['刚加好友','已聊过','感兴趣','已发链接','已注册','已交易','已丢'];
+  var div = document.getElementById('contactFunnel');
+  div.innerHTML = stages.map(function(s, i) {
+    var count = list.filter(function(c) { return c.status === s; }).length;
+    var color = s === 'trading' ? 'green' : s === 'lost' ? 'red' : 'blue';
+    return '<div class="stat-box"><div class="num" style="color:' + (color === 'green' ? '#22c55e' : color === 'red' ? '#ef4444' : '#818cf8') + '">' + count + '</div><div class="lbl">' + labels[i] + '</div></div>';
+  }).join('');
+}
+
+async function updateContact(id, status) {
+  await api('PUT', '/contacts/' + id, { status: status });
+  loadContacts();
+}
+
+// ===== AI改写 =====
+async function aiRewrite() {
+  var content = document.getElementById('msgContent').value.trim();
+  if (!content) { alert('请先在话术输入框里写入要改写的内容'); return; }
+  document.getElementById('aiRewriteResult').textContent = '🤖 AI改写中...';
+  var r = await api('POST', '/ai/rewrite', { content: content, scene: document.getElementById('msgScene').value });
+  if (r.error) { document.getElementById('aiRewriteResult').textContent = '❌ ' + r.error; return; }
+  if (r.versions && r.versions.length > 0) {
+    document.getElementById('msgContent').value = r.versions[0];  // 填入第一个版本
+    document.getElementById('aiRewriteResult').textContent = '✅ 已改写，共' + r.versions.length + '个版本，第一条已填入，可继续点AI改写轮换';
+  }
+}
+
+// ===== 风控面板 =====
+async function loadRiskPanel() {
+  var s = await api('GET', '/accounts/stats');
+  var cfg = await api('GET', '/config');
+  document.getElementById('riskHealthy').textContent = s.healthy || 0;
+  document.getElementById('riskLimited').textContent = s.byStatus?.limited || 0;
+  document.getElementById('riskBanned').textContent = s.banned || 0;
+  document.getElementById('riskTodaySend').textContent = s.todayDm || 0;
+  var r = cfg.rules;
+  document.getElementById('rMinAge').textContent = r.account.minAgeDays;
+  document.getElementById('rSafeAge').textContent = r.account.safeAgeDays;
+  document.getElementById('rSendLimit').textContent = r.account.dailySendLimit;
+  document.getElementById('rGroupLimit').textContent = r.account.dailyGroupLimit;
+  document.getElementById('rSendIntv').textContent = r.account.sendIntervalMin;
+  document.getElementById('rGroupIntv').textContent = r.account.groupIntervalMin;
+  document.getElementById('rWarmup').textContent = r.warmup.zombieDays + '+' + r.warmup.observeDays + '+' + r.warmup.testDays + '天';
+}
+
+async function loadOperationLogs() {
+  var logs = await api('GET', '/logs?limit=30');
+  var div = document.getElementById('logList');
+  div.innerHTML = logs.map(function(l) { 
+    var t = l.time ? new Date(l.time).toLocaleString() : '-';
+    return '<div style="padding:4px 0;border-bottom:1px solid #1a1a23">[' + t + '] ' + JSON.stringify(l);
+  }).join('') || '<div style="color:#52525b">暂无操作日志</div>';
+}
+
+// 扩展switchTab，新标签页自动加载数据
+
+// ===== QQ注册 =====
+async function createRegTask() {
+  var el = document.getElementById('registrarResult');
+  if (!el) { alert('registrarResult元素不存在'); return; }
+  el.innerHTML = '<span style="color:#eab308">⏳ 正在请求...</span>';
+  try {
+    var res = await fetch('/api/registrar/create', { method: 'POST' });
+    var text = await res.text();
+    var data;
+    try { data = JSON.parse(text); } catch(e) { data = {raw: text}; }
+    el.innerHTML = '<span style="color:#22c55e">✅ 成功! ID=' + (data.id || '?') + '</span>';
+    loadRegTasks();
+    loadRegStats();
+  } catch(e) {
+    el.innerHTML = '<span style="color:#ef4444">❌ 错误: ' + e.message + '</span>';
+  }
+}
+async function loadRegTasks() {
+  var list = await api('GET', '/registrar/tasks');
+  var m = {pending:'等待中', got_number:'已获号码', waiting_code:'待验证码', done:'已完成', failed:'失败'};
+  var tbody = document.getElementById('regTaskTable');
+  if (!tbody) return;
+  tbody.innerHTML = list.map(function(t) {
+    return '<tr><td>#' + t.id + '</td><td>' + (t.phoneNumber || '-') + '</td><td>' + (t.registeredQQ || '-') + '</td><td>' + (m[t.status] || t.status) + '</td></tr>';
+  }).join('') || '<tr><td colspan="4" style="text-align:center;color:#52525b">暂无记录</td></tr>';
+}
+window.createRegTask = createRegTask;
+
+async function loadRegStats() {
+  var s = await api('GET', '/registrar/stats');
+  var ids = ['regTotal','regDone','regFailed','regPending'];
+  var vals = [s.total,s.done,s.failed,(s.pending+s.gotNumber+s.waitingCode)];
+  for (var i=0; i<ids.length; i++) {
+    var el = document.getElementById(ids[i]);
+    if (el) el.textContent = vals[i] || 0;
+  }
+}
+async function saveSms() {
+  await api('PUT', '/registrar/config', {
+    provider: document.getElementById('smsProvider').value,
+    apiKey: document.getElementById('smsApiKey').value.trim()
+  });
+  document.getElementById('smsResult').textContent = '✅ 已保存';
+}
+async function loadSmsConfig() {
+  var cfg = await api('GET', '/registrar/config');
+  var sp = document.getElementById('smsProvider');
+  var sk = document.getElementById('smsApiKey');
+  if (sp) sp.value = cfg.provider || 'manual';
+  if (sk) sk.value = cfg.apiKey || '';
+}
+var _origSwitch = switchTab;
+switchTab = function(name) {
+  document.querySelectorAll('.nav-item').forEach(function(n) { n.classList.remove('active'); });
+  document.querySelectorAll('.tab-content').forEach(function(t) { t.classList.remove('active'); });
+  var el = document.querySelector('.nav-item[onclick*="\'' + name + '\'"]');
+  if (el) el.classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+  if (name === 'collector') loadCollectorStats();
+  if (name === 'contacts') loadContacts();
+  if (name === 'risk') loadRiskPanel();
+  if (name === 'accounts') loadAccounts();
+  if (name === 'tasks') loadTasks();
+  if (name === 'messages') loadMessages();
+  if (name === 'settings') loadConfig();
+  if (name === 'dashboard') loadDashboard();
+};
+
+loadDashboard();
+}
+
+// ===== API调用 =====
+async function api(method, path, body) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(API + path, opts);
+  return res.json();
+}
+
+// ===== 总控台 =====
+async function loadDashboard() {
+  const [stats, status] = await Promise.all([
+    api('GET', '/accounts/stats'),
+    api('GET', '/status')
+  ]);
+  document.getElementById('dTotal').textContent = stats.total || 0;
+  document.getElementById('dReady').textContent = (stats.byStatus?.ready || 0) + (stats.byStatus?.breeding || 0);
+  document.getElementById('dBreeding').textContent = stats.byStatus?.pending || 0;
+  document.getElementById('dBanned').textContent = stats.banned || 0;
+  document.getElementById('dGroups').textContent = status.groupCount || 0;
+  document.getElementById('dTasks').textContent = status.taskCount || 0;
+  document.getElementById('dTodaySends').textContent = (stats.todaySends || 0) + ' / 不限';
+  document.getElementById('dTodayGroups').textContent = stats.todayGroups || 0;
+}
+
+// ===== 账号管理 =====
+async function loadAccounts(filter) {
+  const url = filter ? '/accounts?status='+filter : '/accounts';
+  const list = await api('GET', url);
+  const tbody = document.getElementById('acctTable');
+  const statusMap = { pending:'待养号', breeding:'养号中', ready:'可用号', limited:'被限制', banned:'已封号', retired:'弃用' };
+  const colorMap = { pending:'badge-gray', breeding:'badge-yellow', ready:'badge-green', limited:'badge-yellow', banned:'badge-red', retired:'badge-gray' };
+  let html = '';
+  list.forEach(a => {
+    const age = Math.floor((Date.now() - new Date(a.registeredAt).getTime()) / 86400000);
+    html += `<tr><td>${a.id}</td><td>${a.qq}</td><td>${a.remark||'-'}</td><td><span class="badge ${colorMap[a.status]||'badge-gray'}">${statusMap[a.status]||a.status}</span></td><td>${age}天</td><td>${a.todaySends||0}</td><td>
+      <button class="btn btn-outline btn-sm" onclick="updateAcctStatus(${a.id},'ready')">✅ 可用</button>
+      <button class="btn btn-outline btn-sm" onclick="updateAcctStatus(${a.id},'banned')">🚫 封号</button>
+      <button class="btn btn-outline btn-sm" onclick="deleteAcct(${a.id})">🗑</button>
+    </td></tr>`;
+  });
+  tbody.innerHTML = html || '<tr><td colspan="7" style="text-align:center;color:#52525b">暂无账号</td></tr>';
+  document.getElementById('acctCount').textContent = '(' + list.length + ')';
+}
+
+async function importAccounts() {
+  const text = document.getElementById('importText').value.trim();
+  if (!text) return alert('请填写QQ号');
+  const lines = text.split('\n').filter(l => l.trim());
+  const qqList = lines.map(l => {
+    const parts = l.split(',').map(s => s.trim());
+    return { qq: parts[0], pwd: parts[1] || '', remark: parts[2] || '' };
+  });
+  const result = await api('POST', '/accounts/import', { qqList });
+  document.getElementById('importResult').textContent = `成功导入 ${result.imported} 个，共 ${result.total} 个`;
+  document.getElementById('importText').value = '';
+  loadAccounts();
+}
+
+async function updateAcctStatus(id, status) {
+  await api('PUT', `/accounts/${id}/status`, { status });
+  loadAccounts();
+}
+
+async function deleteAcct(id) {
+  if (!confirm('确定删除？')) return;
+  await api('DELETE', `/accounts/${id}`);
+  loadAccounts();
+}
+
+// ===== 目标群 =====
+let keywords = [];
+async function loadKeywords() {
+  const config = await api('GET', '/config');
+  keywords = config.searchKeywords || [];
+  const div = document.getElementById('keywordTags');
+  div.innerHTML = keywords.map(k => `<span class="badge badge-blue" style="cursor:pointer;padding:4px 10px" onclick="document.getElementById('groupKeyword').value='${k}'">${k}</span>`).join('');
+}
+
+async function loadGroups() {
+  const list = await api('GET', '/groups');
+  const statusMap = { pending:'待加入', joined:'已加入', rejected:'被拒绝' };
+  const colorMap = { pending:'badge-yellow', joined:'badge-green', rejected:'badge-red' };
+  const tbody = document.getElementById('groupTable');
+  tbody.innerHTML = list.map(g => `<tr><td>${g.groupNum||'-'}</td><td>${g.keyword}</td><td><span class="badge ${colorMap[g.status]||'badge-gray'}">${statusMap[g.status]||g.status}</span></td><td>
+    <button class="btn btn-outline btn-sm" onclick="updateGroup(${g.id},'joined')">✅ 已加入</button>
+    <button class="btn btn-outline btn-sm" onclick="updateGroup(${g.id},'rejected')">❌ 被拒</button>
+  </td></tr>`).join('') || '<tr><td colspan="4" style="text-align:center;color:#52525b">暂无目标群</td></tr>';
+}
+
+async function addGroup() {
+  const num = document.getElementById('groupNum').value.trim();
+  const kw = document.getElementById('groupKeyword').value.trim();
+  if (!kw) return alert('请输入关键词');
+  await api('POST', '/groups', { groupNum: num, keyword: kw, priority: document.getElementById('groupPriority').value });
+  document.getElementById('groupNum').value = '';
+  document.getElementById('groupKeyword').value = '';
+  loadGroups();
+}
+
+async function updateGroup(id, status) {
+  await api('PUT', `/groups/${id}`, { status });
+  loadGroups();
+}
+
+// ===== 任务 =====
+async function loadTasks(filter) {
+  const list = await api('GET', '/tasks');
+  const filtered = filter ? list.filter(t => t.status === filter) : list;
+  const tbody = document.getElementById('taskTable');
+  const typeMap = { joinGroup:'加群', sendMsg:'私信', breed:'群内养号', scan:'群采集' };
+  const statusMap = { pending:'排队中', ready:'待执行', running:'执行中', done:'已完成', failed:'失败' };
+  const colorMap = { pending:'badge-gray', ready:'badge-yellow', running:'badge-blue', done:'badge-green', failed:'badge-red' };
+  tbody.innerHTML = filtered.map(t => `<tr>
+    <td>${t.id}</td>
+    <td>${typeMap[t.type]||t.type}</td>
+    <td style="font-size:11px">${t.detail?.slice(0,40)||'-'}</td>
+    <td>${t.scheduledAt ? new Date(t.scheduledAt).toLocaleString() : '-'}</td>
+    <td><span class="badge ${colorMap[t.status]||'badge-gray'}">${statusMap[t.status]||t.status}</span></td>
+  </tr>`).join('') || '<tr><td colspan="5" style="text-align:center;color:#52525b">暂无任务</td></tr>';
+}
+
+// ===== 话术 =====
+async function loadMessages() {
+  const list = await api('GET', '/messages');
+  const sceneMap = { first:'首次私信', follow:'跟进', convert:'转化' };
+  const tbody = document.getElementById('msgTable');
+  tbody.innerHTML = list.map(m => `<tr>
+    <td>${sceneMap[m.scene]||m.scene}</td>
+    <td style="font-size:11px;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${m.content}</td>
+    <td><button class="btn btn-outline btn-sm" onclick="deleteMsg(${m.id})">🗑</button></td>
+  </tr>`).join('') || '<tr><td colspan="3" style="text-align:center;color:#52525b">暂无话术</td></tr>';
+  document.getElementById('msgCount').textContent = '(' + list.length + ')';
+}
+
+async function addMessage() {
+  const content = document.getElementById('msgContent').value.trim();
+  if (!content) return alert('请输入话术内容');
+  await api('POST', '/messages', {
+    scene: document.getElementById('msgScene').value,
+    content,
+    images: document.getElementById('msgImages').value.trim()
+  });
+  document.getElementById('msgContent').value = '';
+  document.getElementById('msgImages').value = '';
+  loadMessages();
+}
+
+async function deleteMsg(id) {
+  if (!confirm('删除？')) return;
+  await api('DELETE', `/messages/${id}`);
+  loadMessages();
+}
+
+// ===== 设置 =====
+async function loadConfig() {
+  const cfg = await api('GET', '/config');
+  document.getElementById('cfgMinAge').value = cfg.rules?.account?.minAgeDays || 7;
+  document.getElementById('cfgSafeAge').value = cfg.rules?.account?.safeAgeDays || 15;
+  document.getElementById('cfgSendLimit').value = cfg.rules?.account?.dailySendLimit || 15;
+  document.getElementById('cfgGroupLimit').value = cfg.rules?.account?.dailyGroupLimit || 3;
+  document.getElementById('cfgSendInterval').value = cfg.rules?.account?.sendIntervalMin || 5;
+  document.getElementById('aiProvider').value = cfg.ai?.provider || '';
+  document.getElementById('aiKey').value = cfg.ai?.apiKey || '';
+}
+
+async function saveConfig() {
+  await api('PUT', '/config', {
+    rules: {
+      account: {
+        minAgeDays: parseInt(document.getElementById('cfgMinAge').value) || 7,
+        safeAgeDays: parseInt(document.getElementById('cfgSafeAge').value) || 15,
+        dailySendLimit: parseInt(document.getElementById('cfgSendLimit').value) || 15,
+        dailyGroupLimit: parseInt(document.getElementById('cfgGroupLimit').value) || 3,
+        sendIntervalMin: parseInt(document.getElementById('cfgSendInterval').value) || 5
+      }
+    }
+  });
+  alert('规则已保存');
+}
+
+async function saveAIConfig() {
+  await api('PUT', '/config', {
+    ai: {
+      provider: document.getElementById('aiProvider').value,
+      apiKey: document.getElementById('aiKey').value
+    }
+  });
+  alert('AI配置已保存');
+}
+
+function exportData() {
+  window.open(API + '/../data/db.json', '_blank');
+}
+
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      const res = await fetch(API + '/../data/db.json', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      alert('导入成功，请刷新页面');
+      location.reload();
+    } catch(e) { alert('文件格式错误'); }
+  };
+  reader.readAsText(file);
+}
+
+// ===== 初始化 =====
+// 关键词折叠控制
+var kwShowAll = false;
+function toggleKeywords() {
+  kwShowAll = !kwShowAll;
+  document.getElementById('kwToggleBtn').textContent = kwShowAll ? '收起' : '显示全部';
+  renderKeywords();
+}
+
+function renderKeywords() {
+  var div = document.getElementById('keywordTags');
+  var display = kwShowAll ? keywords : keywords.slice(0, 18);
+  div.innerHTML = display.map(function(k) {
+    return '<span class="badge badge-blue" style="cursor:pointer;padding:4px 10px" onclick="setTargetKW(\''+k+'\')">'+k+'</span>';
+  }).join('');
+  if (!kwShowAll && keywords.length > 18) {
+    div.innerHTML += '<span style="color:#52525b;font-size:11px;line-height:28px">+ ' + (keywords.length - 18) + ' 个...</span>';
+  }
+}
+
+// 重写loadKeywords
+async function loadKeywords() {
+  var res = await fetch('/api/config');
+  var cfg = await res.json();
+  keywords = cfg.searchKeywords || [];
+  renderKeywords();
+}
+
+// ===== 群采集功能 =====
+async function loadCollectorStats() {
+  const s = await api('GET', '/collector/stats');
+  document.getElementById('cTotal').textContent = s.total || 0;
+  document.getElementById('cQualified').textContent = s.qualified || 0;
+  document.getElementById('cJoined').textContent = s.joined || 0;
+  document.getElementById('cMuted').textContent = s.muted || 0;
+  document.getElementById('cFailed').textContent = s.failed || 0;
+  loadPendingGroups();
+}
+
+async function loadPendingGroups() {
+  const list = await api('GET', '/collector/pending?limit=20');
+  document.getElementById('pendingCount').textContent = '(' + list.length + ')';
+  const tbody = document.getElementById('pendingTable');
+  tbody.innerHTML = list.map(g => '<tr><td>' + g.groupNum + '</td><td>' + (g.groupName || '-') + '</td><td>' + g.memberCount + '</td><td>' + g.keyword + '</td><td><button class="btn btn-outline btn-sm" onclick="markGroupJoined(' + g.id + ')">✅ 已加</button></td></tr>').join('') ||
+    '<tr><td colspan="5" style="text-align:center;color:#52525b">暂无合格群，去采集吧</td></tr>';
+}
+
+async function markGroupJoined(id) {
+  await api('PUT', '/groups/' + id, { status: 'joined' });
+  loadPendingGroups();
+  loadCollectorStats();
+}
+
+async function importGroups() {
+  const keyword = document.getElementById('importKeyword').value.trim();
+  const text = document.getElementById('importResults').value.trim();
+  if (!keyword || !text) { alert('请填写关键词和群数据'); return; }
+  const lines = text.split('\n').filter(l => l.trim());
+  const groups = lines.map(l => {
+    var p = l.split(',').map(s => s.trim());
+    return { groupNum: p[0], groupName: p[1] || '', memberCount: parseInt(p[2]) || 0, isMuted: (p[3] === '1' || p[3] === 'true') };
+  });
+  const r = await api('POST', '/collector/import', { keyword, groups });
+  document.getElementById('importGroupResult').textContent = '导入' + r.imported + '个，过滤' + r.filtered + '个，合格' + r.qualified + '个';
+  loadCollectorStats();
+}
+
+async function suggestKeyword() {
+  const r = await api('GET', '/collector/next-keyword');
+  document.getElementById('kwSuggestion').textContent = '💡 建议搜索: ' + (r.keyword || '所有关键词已搜过');
+}
+
+async function manualAddGroup() {
+  const body = {
+    groupNum: document.getElementById('manualGroupNum').value.trim(),
+    groupName: document.getElementById('manualGroupName').value.trim(),
+    memberCount: parseInt(document.getElementById('manualMemberCount').value) || 0,
+    isMuted: document.getElementById('manualIsMuted').value === 'true'
+  };
+  if (!body.groupNum) { alert('请输入群号'); return; }
+  const r = await api('POST', '/collector/manual-add', body);
+  if (r.error) { alert(r.error); return; }
+  document.getElementById('manualAddResult').textContent = '✅ 已添加 ' + (r.group.isMuted ? '(禁言群已过滤)' : '(合格)');
+  loadCollectorStats();
+}
+
+// ===== 联系人管理 =====
+function getStageLabel(s) {
+  var m = { new:'刚加好友', chatting:'已聊过', interested:'感兴趣', sent_link:'已发链接', registered:'已注册', trading:'开始交易', lost:'丢了' };
+  return m[s] || s;
+}
+function getStageColor(s) {
+  var m = { new:'badge-yellow', chatting:'badge-blue', interested:'badge-blue', sent_link:'badge-green', registered:'badge-green', trading:'badge-green', lost:'badge-red' };
+  return m[s] || 'badge-gray';
+}
+
+async function addContact() {
+  var qq = document.getElementById('contactQQ').value.trim();
+  if (!qq) { alert('请输入对方QQ号'); return; }
+  var body = {
+    qq: qq,
+    source: document.getElementById('contactSource').value.trim() || '未标注',
+    accountId: document.getElementById('contactAccount').value.trim() || '',
+    status: document.getElementById('contactStage').value,
+    createdAt: new Date().toISOString()
+  };
+  var r = await api('POST', '/contacts', body);
+  document.getElementById('contactAddResult').textContent = '✅ 已记录';
+  loadContacts();
+}
+
+async function loadContacts(filter) {
+  var list = await api('GET', '/contacts');
+  if (filter) list = list.filter(c => c.status === filter);
+  document.getElementById('contactCount').textContent = '(' + list.length + ')';
+  var tbody = document.getElementById('contactTable');
+  tbody.innerHTML = list.map(c => '<tr><td>' + c.qq + '</td><td>' + (c.source || '-') + '</td><td>' + (c.accountId || '-') + '</td><td><span class="badge ' + getStageColor(c.status) + '">' + getStageLabel(c.status) + '</span></td><td><select onchange="updateContact(' + c.id + ',this.value)" style="font-size:11px;padding:2px 4px">'
+    + ['new','chatting','interested','sent_link','registered','trading','lost'].map(s => '<option value="' + s + '"' + (c.status === s ? ' selected' : '') + '>' + getStageLabel(s) + '</option>').join('')
+    + '</select></td></tr>').join('') || '<tr><td colspan="5" style="text-align:center;color:#52525b">暂无联系人</td></tr>';
+  updateContactFunnel(list);
+}
+
+function updateContactFunnel(list) {
+  var stages = ['new','chatting','interested','sent_link','registered','trading','lost'];
+  var labels = ['刚加好友','已聊过','感兴趣','已发链接','已注册','已交易','已丢'];
+  var div = document.getElementById('contactFunnel');
+  div.innerHTML = stages.map(function(s, i) {
+    var count = list.filter(function(c) { return c.status === s; }).length;
+    var color = s === 'trading' ? 'green' : s === 'lost' ? 'red' : 'blue';
+    return '<div class="stat-box"><div class="num" style="color:' + (color === 'green' ? '#22c55e' : color === 'red' ? '#ef4444' : '#818cf8') + '">' + count + '</div><div class="lbl">' + labels[i] + '</div></div>';
+  }).join('');
+}
+
+async function updateContact(id, status) {
+  await api('PUT', '/contacts/' + id, { status: status });
+  loadContacts();
+}
+
+// ===== AI改写 =====
+async function aiRewrite() {
+  var content = document.getElementById('msgContent').value.trim();
+  if (!content) { alert('请先在话术输入框里写入要改写的内容'); return; }
+  document.getElementById('aiRewriteResult').textContent = '🤖 AI改写中...';
+  var r = await api('POST', '/ai/rewrite', { content: content, scene: document.getElementById('msgScene').value });
+  if (r.error) { document.getElementById('aiRewriteResult').textContent = '❌ ' + r.error; return; }
+  if (r.versions && r.versions.length > 0) {
+    document.getElementById('msgContent').value = r.versions[0];  // 填入第一个版本
+    document.getElementById('aiRewriteResult').textContent = '✅ 已改写，共' + r.versions.length + '个版本，第一条已填入，可继续点AI改写轮换';
+  }
+}
+
+// ===== 风控面板 =====
+async function loadRiskPanel() {
+  var s = await api('GET', '/accounts/stats');
+  var cfg = await api('GET', '/config');
+  document.getElementById('riskHealthy').textContent = s.healthy || 0;
+  document.getElementById('riskLimited').textContent = s.byStatus?.limited || 0;
+  document.getElementById('riskBanned').textContent = s.banned || 0;
+  document.getElementById('riskTodaySend').textContent = s.todayDm || 0;
+  var r = cfg.rules;
+  document.getElementById('rMinAge').textContent = r.account.minAgeDays;
+  document.getElementById('rSafeAge').textContent = r.account.safeAgeDays;
+  document.getElementById('rSendLimit').textContent = r.account.dailySendLimit;
+  document.getElementById('rGroupLimit').textContent = r.account.dailyGroupLimit;
+  document.getElementById('rSendIntv').textContent = r.account.sendIntervalMin;
+  document.getElementById('rGroupIntv').textContent = r.account.groupIntervalMin;
+  document.getElementById('rWarmup').textContent = r.warmup.zombieDays + '+' + r.warmup.observeDays + '+' + r.warmup.testDays + '天';
+}
+
+async function loadOperationLogs() {
+  var logs = await api('GET', '/logs?limit=30');
+  var div = document.getElementById('logList');
+  div.innerHTML = logs.map(function(l) { 
+    var t = l.time ? new Date(l.time).toLocaleString() : '-';
+    return '<div style="padding:4px 0;border-bottom:1px solid #1a1a23">[' + t + '] ' + JSON.stringify(l);
+  }).join('') || '<div style="color:#52525b">暂无操作日志</div>';
+}
+
+// 扩展switchTab，新标签页自动加载数据
+var _origSwitch = switchTab;
+switchTab = function(name) {
+  document.querySelectorAll('.nav-item').forEach(function(n) { n.classList.remove('active'); });
+  document.querySelectorAll('.tab-content').forEach(function(t) { t.classList.remove('active'); });
+  var el = document.querySelector('.nav-item[onclick*="\'' + name + '\'"]');
+  if (el) el.classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+  if (name === 'collector') loadCollectorStats();
+  if (name === 'contacts') loadContacts();
+  if (name === 'risk') loadRiskPanel();
+  if (name === 'accounts') loadAccounts();
+  if (name === 'tasks') loadTasks();
+  if (name === 'messages') loadMessages();
+  if (name === 'settings') loadConfig();
+  if (name === 'dashboard') loadDashboard();
+};
+
+loadDashboard();
+</script>
+
+</body>
+</html>
