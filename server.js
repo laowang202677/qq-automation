@@ -17,6 +17,7 @@ process.on('unhandledRejection', (reason) => {
   console.error(msg);
 });
 
+import { execSync } from 'child_process';
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -595,7 +596,7 @@ app.listen(config.port, async () => {
   
   // exe模式下自动打开浏览器
   if (process.argv[0].endsWith('.exe') && process.platform === 'win32') {
-    const { execSync } = await import('child_process');
+    // execSync imported at top
     try {
       execSync(`start http://127.0.0.1:${config.port}`, { shell: 'cmd.exe' });
     } catch(e) {
