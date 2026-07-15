@@ -1,6 +1,22 @@
 // ============================================================
 // QQ自动化系统 - 管理服务
 // ============================================================
+import fs from 'fs';
+
+// 全局异常捕获 - 写入crash.log
+process.on('uncaughtException', (err) => {
+  const msg = `[${new Date().toISOString()}] UNCAUGHT EXCEPTION: ${err.stack || err.message}
+`;
+  try { fs.writeFileSync('crash.log', msg, {flag:'a'}); } catch(e) {}
+  console.error(msg);
+});
+process.on('unhandledRejection', (reason) => {
+  const msg = `[${new Date().toISOString()}] UNHANDLED REJECTION: ${reason?.stack || reason}
+`;
+  try { fs.writeFileSync('crash.log', msg, {flag:'a'}); } catch(e) {}
+  console.error(msg);
+});
+
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
